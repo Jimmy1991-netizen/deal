@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Deal or No Deal - 12 Boxes with Custom Banker Offers</title>
+<style>
+    body { font-family: Arial; background: #111; color: #fff; text-align: center; padding: 20px; }
+    h1 { font-size: 32px; margin-bottom: 10px; }
+    #boxes { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; max-width: 1050px; margin: auto; }
+    .box { width: 120px; height: 130px; background: brown; border: 5px solid #000; position: relative; cursor: pointer; transition: transform 0.5s, background 0.5s; }
+    .box.open { transform: rotateX(70deg); background: #444 !important; }
+    .label { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: bold; color: yellow; text-shadow: 2px 2px 2px #000; }
+    .nameTag { position: absolute; bottom: 3px; width: 100%; font-size: 14px; color: #fff; font-weight: bold; }
+    .amount { display: none; font-size: 20px; color: yellow; font-weight: bold; margin-top: 5px; }
+    #restartBtn, #replayBtn { margin-top: 20px; padding: 10px 25px; font-size: 18px; border: none; background: gold; font-weight: bold; cursor: pointer; border-radius: 5px; }
+    #moneyBoard { margin-top: 20px; padding: 10px; font-size: 18px; background: #222; display: inline-block; border: 2px solid yellow; border-radius: 10px; }
+    #startArea input { width: 100px; margin: 5px; padding: 5px; }
+    #startArea button { padding: 10px 20px; font-size: 18px; background: lime; border: none; border-radius: 5px; cursor: pointer; }
+    #offerPopup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: yellow; justify-content: center; align-items: center; flex-direction: column; font-size: 30px; font-weight: bold; }
+    #offerPopup button { margin-top: 20px; padding: 10px 20px; font-size: 25px; cursor: pointer; }
+    #revealBtn { display:none; padding: 10px 20px; font-size: 20px; background: red; color: white; border:none; border-radius: 5px; cursor:pointer; margin-top:20px; }
+    #countDownDisplay { display:none; font-size: 32px; font-weight:bold; color: gold; margin-top: 10px; }
+</style>
+</head>
+
+<body>
+
+<h1>Deal or No Deal - 12 Boxes PRO FINAL REVEAL</h1>
+
+<div id="startArea">
+    <p>Enter <b>12 DIFFERENT Amounts</b>:</p>
+    <div id="inputs"></div>
+    <br>
+    <button onclick="startGame(true)">Start Game</button>
+</div>
+
+<br>
+<div id="moneyBoard" style="display:none;"></div>
+<div id="boxes" style="margin-top:20px;"></div>
+<p id="countDownDisplay"></p>
+<br>
+<button id="restartBtn">🔁 Restart Game</button>
+<button id="replayBtn">⟳ Replay Same Values</button>
+<button id="revealBtn" onclick="revealFinal()">🔓 Reveal Kept Box</button>
+
+<div id="offerPopup">
+    <div id="offerText"></div>
+    <button onclick="deal()">Deal</button>
+    <button onclick="noDeal()">No Deal</button>
+</div>
+
+<script>
+let chosenBox = null, chosenBoxAmount = null, boxColor = "brown";
+let openSequence = [3,2,2,1,1,1]; // Custom sequence for banker offers
+let seqIndex = 0, openedCount = 0, finalPhase = false;
+let fixedAmounts = [];
+let offerCount = 0; // Tracks number of offers given
+const names = ["Anna","Ben","Carl","Diana","Ella","Fred","Gina","Hugo","Ivy","John","Kyla","Luis","Macy","Nico","Owen","Pia","Quinn","Rico","Sara","Toby","Uma","Vito","Will","Yana"];
+
+const inputDiv = document.getElementById("inputs");
+for(let i=0;i<12;i++) inputDiv.innerHTML += `<input type="number" id="amt${i}" placeholder="${i+1}">`;
+
+document.getElementById("restartBtn").onclick = () => location.reload();
+document.getElementById("replayBtn").onclick = () => startGame(false);
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ let j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+function randomColor(){ const colors=["brown","maroon","darkblue","darkgreen","darkred","purple","navy","teal"]; return colors[Math.floor(Math.random()*colors.length)]; }
+
+function startGame(firstTime){
+    chosenBox=null; seqIndex=0; openedCount=0; finalPhase=false; offerCount=0;
+    document.getElementById("revealBtn").style.display="none";
+    document.getElementById("offerPopup").style.display="none";
+    document.getElementById("countDownDisplay").style.display="none";
+    document.getElementById("replayBtn").style.display="inline-block";
+
+    if(firstTime){
+        fixedAmounts=[];
+        for(let i=0;i<12;i++){
+            let val=parseInt(document.getElementById(`amt${i}`).value);
+            if(!val || fixedAmounts.includes(val)){ alert("Please input 12 DIFFERENT valid amounts!"); return; }
+            fixedAmounts.push(val);
+        }
+    }
+
+    updateMoneyBoard([...fixedAmounts].sort((a,b)=>a-b));
+    document.getElementById("moneyBoard").style.display="inline-block";
+    document.getElementById("restartBtn").style.display="inline-block";
+
+    boxColor=randomColor();
+    let gameAmounts=[...fixedAmounts]; shuffle(gameAmounts);
+    let boxNames=[...names]; shuffle(boxNames);
+
+    let container=document.getElementById("boxes");
+    container.innerHTML="";
+
+    for(let i=0;i<12;i++){
+        const box=document.createElement("div");
+        box.className="box"; box.style.background=boxColor; box.dataset.amount=gameAmounts[i];
+        box.innerHTML=`<div class="label">${i+1}</div><div class="nameTag">${boxNames[i]}</div><div class="amount">₱ ${gameAmounts[i]}</div>`;
+        box.onclick=()=>handleBoxClick(box);
+        container.appendChild(box);
+    }
+    document.getElementById("startArea").style.display="none";
+}
+
+function handleBoxClick(box){
+    if(finalPhase){ revealLastBox(box); return; }
+    if(!chosenBox){ chosenBox=box; chosenBoxAmount=box.dataset.amount; box.style.background="gold"; alert("Box kept! It will be the LAST to open."); return; }
+    if(box===chosenBox || box.classList.contains("open")) return;
+
+    openBox(box);
+    openedCount++;
+
+    if(openedCount >= openSequence[seqIndex]){ 
+        openedCount = 0; 
+        disableBoxes(); 
+        offerCount++;
+        if(offerCount <= 6){ startCountdown(); } 
+        else { // Final round before revealing kept box
+            seqIndex++;
+            enableBoxes();
+            checkFinalReveal();
+        }
+    }
+}
+
+function openBox(box){
+    box.classList.add("open");
+    setTimeout(()=>box.querySelector(".amount").style.display="block",400);
+    removeFromMoneyBoard(box.dataset.amount);
+    box.style.background="darkgray";
+    checkFinalReveal();
+}
+
+function updateMoneyBoard(arr){
+    document.getElementById("moneyBoard").innerHTML="<b>Money Board:</b><br>"+arr.map(a=>`₱ ${a}`).join(" | ");
+}
+
+function removeFromMoneyBoard(value){
+    let b=document.getElementById("moneyBoard").innerHTML;
+    document.getElementById("moneyBoard").innerHTML=b.replace(`₱ ${value}`,`<span style="color:red;"><s>₱ ${value}</s></span>`);
+}
+
+function disableBoxes(){ document.querySelectorAll(".box").forEach(b=>b.style.pointerEvents="none"); }
+function enableBoxes(){ document.querySelectorAll(".box").forEach(b=>{ if(!b.classList.contains("open")) b.style.pointerEvents="auto"; }); }
+
+function startCountdown(){
+    let time=5, cd=document.getElementById("countDownDisplay");
+    cd.style.display="block"; cd.textContent="Banker's Call in: "+time;
+    let timer=setInterval(()=>{
+        time--; cd.textContent="Banker's Call in: "+time;
+        if(time<=0){ clearInterval(timer); cd.style.display="none"; makeOffer(); }
+    },1000);
+}
+
+function makeOffer(){
+    let remaining = [...document.querySelectorAll(".box:not(.open)")].map(b=>parseInt(b.dataset.amount));
+    remaining.sort((a,b)=>a-b);
+    let min = remaining[0], max = remaining[remaining.length-1];
+
+    // Determine banker offer based on offer count
+    let offer;
+    switch(offerCount){
+        case 1: offer = remaining[4] || remaining[remaining.length-1]; break;
+        case 2: offer = remaining[3] || remaining[remaining.length-1]; break;
+        case 3: offer = remaining[2] || remaining[remaining.length-1]; break;
+        case 4: offer = Math.round((remaining[1]+remaining[remaining.length-2])/2); break;
+        case 5: offer = Math.round((remaining[1]+remaining[remaining.length-1])/2); break;
+        case 6: offer = Math.round((remaining[remaining.length-1]+2*remaining[0])/3); break;
+        default: // After 6 offers, dynamic adaptive
+            let avg = remaining.reduce((a,b)=>a+b,0)/remaining.length;
+            offer = Math.round(avg*0.6 + max*0.4);
+    }
+
+    offer = Math.min(Math.max(offer, min+1), max-1);
+
+    document.getElementById("offerText").innerHTML = `BANKER'S OFFER: <br> ₱ ${offer}`;
+    document.getElementById("offerPopup").style.display = "flex";
+}
+
+function deal(){ alert("You Accepted the Deal! 👏 Congratulations!"); disableBoxes(); document.getElementById("offerPopup").style.display="none"; }
+function noDeal(){ document.getElementById("offerPopup").style.display="none"; seqIndex++; enableBoxes(); checkFinalReveal(); }
+
+function checkFinalReveal(){
+    const unopened=document.querySelectorAll(".box:not(.open)").length;
+    if(unopened<=2 && !finalPhase){
+        finalPhase=true; disableBoxes(); enableBoxes();
+        document.getElementById("revealBtn").style.display="inline-block";
+    }
+}
+
+function revealFinal(){
+    openBox(chosenBox);
+    alert("Your Box Contains: ₱ "+chosenBoxAmount);
+    disableBoxes();
+}
+
+function revealLastBox(box){
+    if(box===chosenBox || box.classList.contains("open")) return;
+    openBox(box);
+    alert("This box contains: ₱ "+box.dataset.amount);
+    disableBoxes();
+}
+</script>
+
+</body>
+</html>
